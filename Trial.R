@@ -1,11 +1,15 @@
 
 ########################################################
 
+
+
 ### R code for  COVID 19 modeling in Ethiopia ###
 
 ##########################################################
-
+library('reshape2')
+library('ggplot2')
 library(deSolve)
+library(dplyr)
 covid_model=function(current_timepoint, state_values, parameters)
 {	
   
@@ -69,8 +73,8 @@ Ih=0.0003833999
 Iu=0.00000393011
 R=0.023003500
 D=0.0000347588
-
-
+N=S+v+E+Ia+Is+Ih+Iu+R+D
+print(N)
 initial_values=c(S=S, v=v, E=E, Ia=Ia, Is=Is, Ih=Ih, Iu=Iu, R=R, D=D)
 # N=S+v+E+Ia+Is+Ih+Iu+R+D
 
@@ -86,8 +90,7 @@ tail(output)
 
 
 ### Plot the above Result####
-library('reshape2')
-library('ggplot2')
+
 melted = melt(output, id.vars="time")
 ggplot(data=melted, aes(x=time, y=value, color=variable)) +
   geom_line(size=0.9)
@@ -111,17 +114,18 @@ output_N$N_t<- NV
 
 ### let us compute the incidence ###
 output_incidence<-output %>% mutate(incidence = ((IsV+IaV- lag(IsV+IaV))/NV)*100000)
-print(output_incidence)
+print(output_incidence$incidence)
 tail(output_incidence)
-
-
+plot(output_incidence$time,output_incidence$incidence,type = 'l',)
 
 #### model fitting and parameter estimation using least square estimation technique###
 # now find the values of beta and kappa that give the smallest RSS, which represents the best fit to the data.
-read.csv("C:/Users/User/Desktop/ethiopian data I.csv")
+# save the data in the git folder for us to access
+ethiopian.data.I <- read.csv("C:/Users/User/Desktop/ethiopian data I.csv")
 print(ethiopian.data.I)
 Infected<-ethiopian.data.I$Infected
 times_of_Infected<-ethiopian.data.I$date
+
 outputt <- function(time, state, parameters) {
   par <- as.list(c(time, state, parameters))
   with(par, {
@@ -152,10 +156,7 @@ D=0.0000347588
 
 ### Initial state values for the above differential equations###
 initial_values=c(S=S, v=v, E=E, Ia=Ia, Is=Is, Ih=Ih, Iu=Iu, R=R, D=D)
-parameters<-c(0.725,  0.015); names(parameters) <- c("beta"
-                                                     
-                                                     ,
-                                                     "kappa")
+parameters<-c(0.725,  0.015); names(parameters) <- c("beta"   ,   "kappa")
 days <- seq_along(ethiopian.data.I$Infected)
 
 solution <- ode(initial_values, times = days, func = outputt, parms = parameters)
@@ -174,23 +175,15 @@ D=0.0000347588
 initial_values=c(S=S, v=v, E=E, Ia=Ia, Is=Is, Ih=Ih, Iu=Iu, R=R, D=D)
 ## RSS as an R function
 RSS <- function(parameters){
-  names(parameters) <- c("beta"
-                         
-                         ,
-                         "kappa") # parameters must be named
+  names(parameters) <- c("beta",  "kappa") # parameters must be named
   solution <- ode(initial_values, times = days, func = outputt, parms = parameters)
   I <- solution[, 5] # fifth column of ODE solution
   
   return(sum(Infected - I)^2)
 }
-optimal_sol <- optim(c(0.5, 0.5), RSS, method =
-                       "L-BFGS-B"
-                     ,
-                     lower = c(0, 0), upper = c(1, 1))
-fitted_pars <- setNames(optimal_sol$par, c("beta"
-                                           
-                                           ,
-                                           "kappa"))
+optimal_sol <- optim(c(0.5, 0.5), RSS, method = "L-BFGS-B",lower = c(0, 0), upper = c(1, 1))
+
+fitted_pars <- setNames(optimal_sol$par, c("beta", "kappa"))
 print(round(fitted_pars,3))
 
 
